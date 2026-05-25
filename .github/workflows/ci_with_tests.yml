@@ -1,0 +1,60 @@
+name: CI - Backend Smoke + LLM Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  backend-smoke-and-tests:
+    runs-on: ubuntu-latest
+    env:
+      MOCK_LLM: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install system packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake libopenblas-dev libomp-dev
+
+      - name: Install pip dependencies
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install --upgrade pip setuptools wheel
+          if [ -f backend/requirements.txt ]; then pip install -r backend/requirements.txt; fi
+          if [ -f backend/ci-requirements.txt ]; then pip install -r backend/ci-requirements.txt; fi
+
+      - name: Start backend
+        run: |
+          cd backend
+          source ../.venv/bin/activate || source .venv/bin/activate || true
+          nohup python -m uvicorn main:app --host 127.0.0.1 --port 8000 > uvicorn.log 2>&1 &
+          sleep 6
+
+      - name: Smoke test /api/health
+        run: |
+          curl -f http://127.0.0.1:8000/api/health || (echo 'health failed' && tail -n +1 uvicorn.log && exit 1)
+
+      - name: Run LLM self-tests
+        run: |
+          pytest -q backend/tests --maxfail=1 -k llm
+
+      - name: Check /api/llm/status (non-fatal)
+        run: |
+          curl -sS http://127.0.0.1:8000/api/llm/status || echo 'llm status check failed (expected if model missing)'
+
+      - name: Upload uvicorn logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uvicorn-log
+          path: backend/uvicorn.log
