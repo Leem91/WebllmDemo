@@ -9,7 +9,7 @@ Prerequisites:
 
 Quick start (venv recommended):
 1. cd backend
-2. python -m venv .venv && source .venv/bin/activate  # or .venv\\Scripts\\activate on Windows
+2. python -m venv .venv && source .venv/bin/activate  # or .venv\Scripts\activate on Windows
 3. pip install -r requirements.txt
 4. export LLAMA_MODEL_PATH=./models/your-quantized-model.bin
 5. python -m uvicorn llama_server:app --host 0.0.0.0 --port 8080

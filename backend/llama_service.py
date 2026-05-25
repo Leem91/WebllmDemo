@@ -51,6 +51,7 @@ class LlamaService:
         """
         Returns a generator yielding bytes in SSE (Server-Sent Events) "data: ...\n\n" format.
         Each event payload is a JSON object similar to OpenAI stream chunks: {"choices":[{"delta":{"content":"..."}}]}
+        This implementation is more tolerant of different chunk shapes (bytes, str, dict) produced by llama-cpp-python.
         """
         self.ensure_loaded()
         prompt = self._messages_to_prompt(messages)
@@ -68,14 +69,33 @@ class LlamaService:
         for chunk in gen:
             text = ""
             try:
-                if isinstance(chunk, dict):
-                    # Common shape: {'choices':[{'text': '...'}]} or choices.deltas
-                    ch = chunk.get("choices", [])[0]
-                    text = ch.get("text") or ch.get("delta", {}).get("content", "") or ""
+                if isinstance(chunk, (bytes, bytearray)):
+                    text = chunk.decode("utf-8", errors="ignore")
+                elif isinstance(chunk, str):
+                    text = chunk
+                elif isinstance(chunk, dict):
+                    # Support shapes like {'choices':[{'text':...}]} or {'choices':[{'delta':{'content':...}}]}
+                    ch = chunk.get("choices")
+                    if ch and isinstance(ch, list) and len(ch) > 0:
+                        first = ch[0]
+                        if isinstance(first, dict):
+                            text = first.get("text") or first.get("delta", {}).get("content") or first.get("content") or ""
+                        else:
+                            text = str(first)
+                    else:
+                        # Fallback: stringify the dict
+                        text = json.dumps(chunk, ensure_ascii=False)
                 else:
                     text = str(chunk)
             except Exception:
-                text = str(chunk)
+                try:
+                    text = str(chunk)
+                except Exception:
+                    text = ""
+
+            if not text:
+                # skip empty tokens
+                continue
 
             # Emit SSE event
             try:
