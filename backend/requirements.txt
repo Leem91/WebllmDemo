@@ -4,3 +4,5 @@ llama-cpp-python
 requests
 httpx[http2]
 python-dotenv
+pytest
+httpx[http2]
