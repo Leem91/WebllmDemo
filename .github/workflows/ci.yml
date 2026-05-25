@@ -9,6 +9,8 @@ on:
 jobs:
   backend-smoke:
     runs-on: ubuntu-latest
+    env:
+      MOCK_LLM: "1"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
