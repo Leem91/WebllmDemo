@@ -1,0 +1,5 @@
+fastapi
+uvicorn[standard]
+llama-cpp-python
+requests
+python-dotenv
